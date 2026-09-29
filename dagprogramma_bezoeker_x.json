@@ -1,0 +1,17 @@
+{
+    "bezoekersgegevens": {
+        "naam": "Piet de Jong",
+        "gender": "M",
+        "verblijfsduur": 600,
+        "leeftijd": 32,
+        "lengte": 190,
+        "gewicht": 105,
+        "voorkeuren_attractietypes": "Achtbaan,Simulator,Water",
+        "lievelingsattracties": "Sky Diver",
+        "voorkeuren_eten": "Patat,Snoep,IJs",
+        "rekening_houden_met_weer": 0
+    },
+    "weergegevens": {},
+    "voorzieningen": [],
+    "totale_duur": 0
+}

@@ -1,0 +1,17 @@
+{
+    "metadata": {
+        "aanmeldzuil_id": 23,
+        "transactie_id": 509,
+        "datum_tijd": ["19-4-2024", "10:39"]
+    },
+    "naam": "Piet de Jong",
+    "gender": "M",
+    "leeftijd": 32,
+    "lengte": 190,
+    "gewicht": 105,
+    "verblijfsduur": 600,
+    "voorkeuren_attractietypes": ["Achtbaan", "Simulator", "Water"],
+    "voorkeuren_eten": ["Patat", "Snoep", "IJs"],
+    "lievelingsattracties": ["Sky Diver"],
+    "rekening_houden_met_weer": false
+}
