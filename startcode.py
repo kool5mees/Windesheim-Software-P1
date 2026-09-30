@@ -64,53 +64,48 @@ def _generate_plan(bezoeker, temperatuur, regen):
 
 async def main():
     #maak async?
-    bezoekers = db.execute_query("SELECT * FROM Bezoeker;")
     temperatuur, regen = roep_weer_api()
-    
     print(temperatuur, regen)
+
+
+    bezoekers = db.execute_query("SELECT * FROM Bezoeker;")
+    db.close()
+    
+    #tijdelijk dagprogamma uitdraaien
+    for bezoeker in bezoekers:
+        dagprogramma = {
+            "bezoekersgegevens" : {
+                "naam": bezoeker['naam'],
+                "gender": bezoeker['gender'],
+                "verblijfsduur": bezoeker["verblijfsduur"],
+                "leeftijd": bezoeker["leeftijd"],
+                "lengte": bezoeker["lengte"],
+                "gewicht": bezoeker["gewicht"],
+                "voorkeuren_attractietypes": bezoeker["voorkeuren_attractietypes"],
+                "lievelingsattracties": bezoeker["lievelingsattracties"],
+                "voorkeuren_eten": bezoeker["voorkeuren_eten"],
+                "rekening_houden_met_weer": bezoeker["rekening_houden_met_weer"]
+            },
+            "weergegevens" : {
+                "temperatuur": temperatuur,
+                "kans_op_regen": regen
+            }, 
+            "voorzieningen": [] # STAP 2: hier komt een lijst met alle voorzieningen
+            ,
+            "totale_duur": 0 # STAP 3: aanpassen naar daadwerkelijke totale duur
+        }
+        with open(f'dagprogramma_bezoeker_{bezoeker["naam"]}.json', 'w') as json_bestand_uitvoer:
+            json.dump(dagprogramma, json_bestand_uitvoer, indent=4)
+
 
     #haal de async event loop op
     loop = asyncio.get_event_loop()
 
-
+    #maar een lijst met daarin _generate_plan en zijn argumeenten voor elke bezoeker die parallel gerund gaat worden
     planningen = [loop.run_in_executor(None, _generate_plan, bezoeker, temperatuur, regen) for bezoeker in bezoekers]
-
+    
+    #verzamel alle _generate_plans en start ze in hun eigen threads
     resultaten = await asyncio.gather(*planningen)
-
-
-
-
-    # bezoeker_id = 1
-    # select_query = f"SELECT * FROM Bezoeker WHERE id = {bezoeker_id}"
-    # resultaat = db.execute_query(select_query)
-
-    # bezoeker = resultaat[0]
-    # print(bezoeker['naam']) 
-
-
-    # select_query = "SELECT * FROM voorziening"
-    # voorzieningen = db.execute_query(select_query)
-    # pprint.pp(voorzieningen) 
-    # print(voorzieningen[0]["naam"])
-
-    db.close()
-
-    # dagprogramma = {
-    #     "bezoekersgegevens" : {
-    #         "naam": bezoeker['naam'] # voorbeeld van hoe je bij een eigenschap komt
-    #         # STAP 1: vul aan met andere benodigde eigenschappen
-    #     },
-    #     "weergegevens" : {
-    #         # STAP 4: vul aan met weergegevens
-    #     }, 
-    #     "voorzieningen": [] # STAP 2: hier komt een lijst met alle voorzieningen
-    #     ,
-    #     "totale_duur": 0 # STAP 3: aanpassen naar daadwerkelijke totale duur
-    # }
-
-    # with open('dagprogramma_bezoeker_x.json', 'w') as json_bestand_uitvoer:
-    #     json.dump(dagprogramma, json_bestand_uitvoer, indent=4)
-
 if __name__ == "__main__":
     asyncio.run(
         main()
