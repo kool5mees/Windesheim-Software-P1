@@ -4,12 +4,17 @@ import json
 import pprint
 from database_wrapper import Database
 from requests import get
+from concurrent.futures import ThreadPoolExecutor
+import asyncio
 
 #Database connectie
 db = Database(host="localhost", gebruiker="user", wachtwoord="password", database="attractiepark_casus_a")
-# altijd verbinding openen om query's uit te voeren
 db.connect()
 
+#creer een threadpool voor het multithreaden van planningen berekenen
+executor = ThreadPoolExecutor(max_workers=10)
+
+#roep meteo weer api aan en return regen en temperatuur
 def roep_weer_api():
     url = "https://api.open-meteo.com/v1/forecast"
     params = {
@@ -19,34 +24,58 @@ def roep_weer_api():
         "timezone": "auto",
     }
     response = get(url=url, params=params)
+    #pakt de response body en zet de json om naar een python struct
     data = response.json()
     temperatuur = data["current"]["temperature_2m"]
     regen = data["current"]["rain"]
     return temperatuur, regen
 
 def bereken_fixed_items(voorkeur_eten:list, verblijfsduur:int, rekening_houden_weer:bool, temperatuur, regen:bool):
+     
      return
 
+def _generate_plan(bezoeker, temperatuur, regen):
+    thread_db = Database(host="localhost", gebruiker="user", wachtwoord="password", database="attractiepark_casus_a")
+    thread_db.connect()
+
+    bereken_fixed_items(
+        voorkeur_eten=bezoeker["voorkeuren_eten"], 
+        verblijfsduur=bezoeker["verblijfsduur"],
+        rekening_houden_weer=bool(bezoeker["rekening_houden_met_weer"]),
+        temperatuur=temperatuur,
+        regen=regen,
+        )
+    
+    voorzieningen = thread_db.execute_query(f"""
+        SELECT * FROM voorziening WHERE
+        attractie_min_lengte <= {bezoeker["lengte"]} AND
+        attractie_max_lengte >= {bezoeker["lengte"]} AND
+        attractie_min_leeftijd <= {bezoeker["leeftijd"]} AND
+        attractie_max_gewicht >= {bezoeker["gewicht"]} OR 
+        type = 'winkel' OR 
+        type = 'horeca'
+    """)
+
+    print(bezoeker["naam"])
+    pprint.pp(voorzieningen)    
+
+    return
 
 
-def main():
-
+async def main():
     #maak async?
     bezoekers = db.execute_query("SELECT * FROM Bezoeker;")
     temperatuur, regen = roep_weer_api()
-
+    
     print(temperatuur, regen)
-    for bezoeker in bezoekers:
-        print(bezoeker["naam"])
-        bereken_fixed_items(
-            voorkeur_eten=bezoeker["voorkeuren_eten"], 
-            verblijfsduur=bezoeker["verblijfsduur"],
-            rekening_houden_weer=bool(bezoeker["rekening_houden_met_weer"]),
-            temperatuur=temperatuur,
-            regen=regen,
-            )
 
-    roep_weer_api()
+    #haal de async event loop op
+    loop = asyncio.get_event_loop()
+
+
+    planningen = [loop.run_in_executor(None, _generate_plan, bezoeker, temperatuur, regen) for bezoeker in bezoekers]
+
+    resultaten = await asyncio.gather(*planningen)
 
 
 
@@ -64,7 +93,7 @@ def main():
     # pprint.pp(voorzieningen) 
     # print(voorzieningen[0]["naam"])
 
-    # db.close()
+    db.close()
 
     # dagprogramma = {
     #     "bezoekersgegevens" : {
@@ -83,4 +112,6 @@ def main():
     #     json.dump(dagprogramma, json_bestand_uitvoer, indent=4)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(
+        main()
+        )
