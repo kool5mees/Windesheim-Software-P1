@@ -31,33 +31,68 @@ def roep_weer_api():
     return temperatuur, regen
 
 def bereken_fixed_items(voorkeur_eten:list, verblijfsduur:int, rekening_houden_weer:bool, temperatuur, regen:bool):
-     
-     return
+    if temperatuur >= 20 and rekening_houden_weer == True:
+        return "ijsje"
+
+    if regen == True and rekening_houden_weer == True:
+        return  "regen"
+
+    if verblijfsduur >= 240:
+        return "elke 2 uur lunch"
+    else:
+        return "1 keer lunch"
 
 def _generate_plan(bezoeker, temperatuur, regen):
     thread_db = Database(host="localhost", gebruiker="user", wachtwoord="password", database="attractiepark_casus_a")
     thread_db.connect()
 
-    bereken_fixed_items(
-        voorkeur_eten=bezoeker["voorkeuren_eten"], 
-        verblijfsduur=bezoeker["verblijfsduur"],
-        rekening_houden_weer=bool(bezoeker["rekening_houden_met_weer"]),
-        temperatuur=temperatuur,
-        regen=regen,
-        )
+    #reserverd_items, reserverd_time =bereken_fixed_items(
+    #    voorkeur_eten=bezoeker["voorkeuren_eten"], 
+    #    verblijfsduur=bezoeker["verblijfsduur"],
+    #    rekening_houden_weer=bool(bezoeker["rekening_houden_met_weer"]),
+    #    temperatuur=temperatuur,
+    #    regen=regen,
+    #    )
+
+    #tijd_left = bezoeker["verblijfsduur"] - reserverd_time
+
+    tijd_over = bezoeker["verblijfsduur"]
     
     voorzieningen = thread_db.execute_query(f"""
         SELECT * FROM voorziening WHERE
-        attractie_min_lengte <= {bezoeker["lengte"]} AND
-        attractie_max_lengte >= {bezoeker["lengte"]} AND
-        attractie_min_leeftijd <= {bezoeker["leeftijd"]} AND
-        attractie_max_gewicht >= {bezoeker["gewicht"]} OR 
-        type = 'winkel' OR 
-        type = 'horeca'
+        attractie_min_lengte <= {bezoeker["lengte"]} OR attractie_min_lengte IS NULL AND
+        attractie_max_lengte >= {bezoeker["lengte"]} OR attractie_max_lengte IS NULL AND
+        attractie_min_leeftijd <= {bezoeker["leeftijd"]} OR attractie_min_leeftijd  IS NULL AND
+        attractie_max_gewicht >= {bezoeker["gewicht"]} OR attractie_max_gewicht IS NULL AND
+        type != 'winkel' AND type != 'horeca'
     """)
 
+    if not bezoeker["voorkeuren_eten"]:
+        horeca = ["niks"]
+    else:
+        voorkeuren_lijst = [item.strip() for item in bezoeker["voorkeuren_eten"].split(",")]
+        voorkeuren_string = ", ".join(f"'{item}'" for item in  voorkeuren_lijst)
+        horeca = thread_db.execute_query(f"""
+            SELECT * FROM voorziening WHERE type = 'horeca' AND productaanbod IN({voorkeuren_string}) 
+        """)
+
+    lievelingsattracties = bezoeker["lievelingsattracties"].split(",") if bezoeker["lievelingsattracties"] else []
+    voorkeuren_attractietypes = bezoeker["voorkeuren_attractietypes"].split(",") if bezoeker["voorkeuren_attractietypes"] else []
+
+    attractielijst = []
+    for favoriet in lievelingsattracties:
+        for voorziening in voorzieningen:
+            if favoriet == voorziening["naam"]:
+                favoriete_attractietijd_nodig = (int(voorziening["geschatte_wachttijd"]) + int(voorziening["doorlooptijd"])) * 2
+                if tijd_over - favoriete_attractietijd_nodig >= 0:
+                    attractielijst.append(voorziening)
+                    attractielijst.append(voorziening)
+                    tijd_over -= favoriete_attractietijd_nodig
+                    break
+
     print(bezoeker["naam"])
-    pprint.pp(voorzieningen)    
+    pprint.pp(attractielijst)   
+    print(tijd_over) 
 
     return
 
@@ -73,6 +108,8 @@ async def main():
     
     #tijdelijk dagprogamma uitdraaien
     for bezoeker in bezoekers:
+        bezoeker["rekening_houden_met_weer"] = True if bezoeker["rekening_houden_met_weer"] == 1 else False
+
         dagprogramma = {
             "bezoekersgegevens" : {
                 "naam": bezoeker['naam'],
@@ -106,6 +143,7 @@ async def main():
     
     #verzamel alle _generate_plans en start ze in hun eigen threads
     resultaten = await asyncio.gather(*planningen)
+
 if __name__ == "__main__":
     asyncio.run(
         main()
