@@ -57,7 +57,7 @@ def _generate_plan(bezoeker, temperatuur, regen):
 
     #tijd_left = bezoeker["verblijfsduur"] - reserverd_time
 
-    tijd_over = bezoeker["verblijfsduur"]
+    tijd_gebruikt = 0
     
     voorzieningen = thread_db.execute_query(f"""
         SELECT * FROM voorziening WHERE
@@ -72,16 +72,22 @@ def _generate_plan(bezoeker, temperatuur, regen):
         horeca = thread_db.execute_query(f"""
             SELECT * FROM voorziening WHERE type = 'horeca' 
         """)
-        gekozen_horeca = horeca[randint(0, len(horeca))]
-        tijd_over -= 15
+        gekozen_horeca = horeca[randint(0, len(horeca)) - 1]
+        if 15 > bezoeker["verblijfsduur"]:
+            #TODO maak een echte error
+            return "error"
+        tijd_gebruikt += 15
     else:
         voorkeuren_lijst = [item.strip() for item in bezoeker["voorkeuren_eten"].split(",")]
         voorkeuren_string = ", ".join(f"'{item}'" for item in  voorkeuren_lijst)
         horeca = thread_db.execute_query(f"""
             SELECT * FROM voorziening WHERE type = 'horeca' AND productaanbod IN({voorkeuren_string}) 
         """)
-        gekozen_horeca = horeca[randint(0, len(horeca))]
-        tijd_over -= 15
+        gekozen_horeca = horeca[randint(0, len(horeca)) - 1]
+        if 15 > bezoeker["verblijfsduur"]:
+            #TODO maak een echte error
+            return "error"
+        tijd_gebruikt += 15
 
     lievelingsattracties = bezoeker["lievelingsattracties"].split(",") if bezoeker["lievelingsattracties"] else []
     voorkeuren_attractietypes = bezoeker["voorkeuren_attractietypes"].split(",") if bezoeker["voorkeuren_attractietypes"] else []
@@ -91,10 +97,10 @@ def _generate_plan(bezoeker, temperatuur, regen):
         for voorziening in voorzieningen:
             if favoriet == voorziening["naam"]:
                 favoriete_attractietijd_nodig = (int(voorziening["geschatte_wachttijd"]) + int(voorziening["doorlooptijd"])) * 2
-                if tijd_over - favoriete_attractietijd_nodig >= 0:
+                if favoriete_attractietijd_nodig + tijd_gebruikt <= bezoeker["verblijfsduur"]:
                     attractielijst.append(voorziening)
                     attractielijst.append(voorziening)
-                    tijd_over -= favoriete_attractietijd_nodig
+                    tijd_gebruikt += favoriete_attractietijd_nodig
                     break
 
     midden = len(attractielijst) // 2
@@ -102,14 +108,14 @@ def _generate_plan(bezoeker, temperatuur, regen):
 
     print(bezoeker["naam"])
     pprint.pp(attractielijst)   
-    print(tijd_over) 
+    print(tijd_gebruikt) 
 
     bezoeker["rekening_houden_met_weer"] = True if bezoeker["rekening_houden_met_weer"] == 1 else False
 
     dagprogramma = {
         "bezoekersgegevens" : {
             "naam": bezoeker['naam'],
-            "gender": bezoeker['gender'],
+            #"gender": bezoeker['gender'], volgens testplan hoeft gender er niet in?
             "verblijfsduur": bezoeker["verblijfsduur"],
             "leeftijd": bezoeker["leeftijd"],
             "lengte": bezoeker["lengte"],
@@ -125,7 +131,7 @@ def _generate_plan(bezoeker, temperatuur, regen):
         }, 
         "voorzieningen": attractielijst
         ,
-        "totale_duur": 0 # STAP 3: aanpassen naar daadwerkelijke totale duur
+        "totale_duur": tijd_gebruikt
     }
     
     with open(f'dagprogramma_bezoeker_{bezoeker["naam"]}.json', 'w') as json_bestand_uitvoer:
@@ -154,3 +160,9 @@ if __name__ == "__main__":
     asyncio.run(
         main()
         )
+
+
+#voeg anti sql injection toe
+#correcte velden toevoegen
+#in plaats van tijd aftrekken gwn bijhouden en dan vergelijken met verblijftijd
+#Onthou Types in gebruikers attractie voorkeuren zijn met hoofdletter maar type in voorziening is zonder hoofdletter
