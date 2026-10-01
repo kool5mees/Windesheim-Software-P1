@@ -6,6 +6,7 @@ from database_wrapper import Database
 from requests import get
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
+from random import randint
 
 #Database connectie
 db = Database(host="localhost", gebruiker="user", wachtwoord="password", database="attractiepark_casus_a")
@@ -68,13 +69,19 @@ def _generate_plan(bezoeker, temperatuur, regen):
     """)
 
     if not bezoeker["voorkeuren_eten"]:
-        horeca = ["niks"]
+        horeca = thread_db.execute_query(f"""
+            SELECT * FROM voorziening WHERE type = 'horeca' 
+        """)
+        gekozen_horeca = horeca[randint(0, len(horeca))]
+        tijd_over -= 15
     else:
         voorkeuren_lijst = [item.strip() for item in bezoeker["voorkeuren_eten"].split(",")]
         voorkeuren_string = ", ".join(f"'{item}'" for item in  voorkeuren_lijst)
         horeca = thread_db.execute_query(f"""
             SELECT * FROM voorziening WHERE type = 'horeca' AND productaanbod IN({voorkeuren_string}) 
         """)
+        gekozen_horeca = horeca[randint(0, len(horeca))]
+        tijd_over -= 15
 
     lievelingsattracties = bezoeker["lievelingsattracties"].split(",") if bezoeker["lievelingsattracties"] else []
     voorkeuren_attractietypes = bezoeker["voorkeuren_attractietypes"].split(",") if bezoeker["voorkeuren_attractietypes"] else []
@@ -90,11 +97,39 @@ def _generate_plan(bezoeker, temperatuur, regen):
                     tijd_over -= favoriete_attractietijd_nodig
                     break
 
+    midden = len(attractielijst) // 2
+    attractielijst.insert(midden, gekozen_horeca)
+
     print(bezoeker["naam"])
     pprint.pp(attractielijst)   
     print(tijd_over) 
 
-    return
+    bezoeker["rekening_houden_met_weer"] = True if bezoeker["rekening_houden_met_weer"] == 1 else False
+
+    dagprogramma = {
+        "bezoekersgegevens" : {
+            "naam": bezoeker['naam'],
+            "gender": bezoeker['gender'],
+            "verblijfsduur": bezoeker["verblijfsduur"],
+            "leeftijd": bezoeker["leeftijd"],
+            "lengte": bezoeker["lengte"],
+            "gewicht": bezoeker["gewicht"],
+            "voorkeuren_attractietypes": bezoeker["voorkeuren_attractietypes"],
+            "lievelingsattracties": bezoeker["lievelingsattracties"],
+            "voorkeuren_eten": bezoeker["voorkeuren_eten"],
+            "rekening_houden_met_weer": bezoeker["rekening_houden_met_weer"]
+        },
+        "weergegevens" : {
+            "temperatuur": temperatuur,
+            "kans_op_regen": regen
+        }, 
+        "voorzieningen": attractielijst
+        ,
+        "totale_duur": 0 # STAP 3: aanpassen naar daadwerkelijke totale duur
+    }
+    
+    with open(f'dagprogramma_bezoeker_{bezoeker["naam"]}.json', 'w') as json_bestand_uitvoer:
+        json.dump(dagprogramma, json_bestand_uitvoer, indent=4)
 
 
 async def main():
@@ -105,35 +140,6 @@ async def main():
 
     bezoekers = db.execute_query("SELECT * FROM Bezoeker;")
     db.close()
-    
-    #tijdelijk dagprogamma uitdraaien
-    for bezoeker in bezoekers:
-        bezoeker["rekening_houden_met_weer"] = True if bezoeker["rekening_houden_met_weer"] == 1 else False
-
-        dagprogramma = {
-            "bezoekersgegevens" : {
-                "naam": bezoeker['naam'],
-                "gender": bezoeker['gender'],
-                "verblijfsduur": bezoeker["verblijfsduur"],
-                "leeftijd": bezoeker["leeftijd"],
-                "lengte": bezoeker["lengte"],
-                "gewicht": bezoeker["gewicht"],
-                "voorkeuren_attractietypes": bezoeker["voorkeuren_attractietypes"],
-                "lievelingsattracties": bezoeker["lievelingsattracties"],
-                "voorkeuren_eten": bezoeker["voorkeuren_eten"],
-                "rekening_houden_met_weer": bezoeker["rekening_houden_met_weer"]
-            },
-            "weergegevens" : {
-                "temperatuur": temperatuur,
-                "kans_op_regen": regen
-            }, 
-            "voorzieningen": [] # STAP 2: hier komt een lijst met alle voorzieningen
-            ,
-            "totale_duur": 0 # STAP 3: aanpassen naar daadwerkelijke totale duur
-        }
-        with open(f'dagprogramma_bezoeker_{bezoeker["naam"]}.json', 'w') as json_bestand_uitvoer:
-            json.dump(dagprogramma, json_bestand_uitvoer, indent=4)
-
 
     #haal de async event loop op
     loop = asyncio.get_event_loop()
@@ -142,7 +148,7 @@ async def main():
     planningen = [loop.run_in_executor(None, _generate_plan, bezoeker, temperatuur, regen) for bezoeker in bezoekers]
     
     #verzamel alle _generate_plans en start ze in hun eigen threads
-    resultaten = await asyncio.gather(*planningen)
+    await asyncio.gather(*planningen)
 
 if __name__ == "__main__":
     asyncio.run(
