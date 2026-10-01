@@ -61,12 +61,12 @@ def _generate_plan(bezoeker, temperatuur, regen):
     
     voorzieningen = thread_db.execute_query(f"""
         SELECT * FROM voorziening WHERE
-        attractie_min_lengte <= {bezoeker["lengte"]} OR attractie_min_lengte IS NULL AND
-        attractie_max_lengte >= {bezoeker["lengte"]} OR attractie_max_lengte IS NULL AND
-        attractie_min_leeftijd <= {bezoeker["leeftijd"]} OR attractie_min_leeftijd  IS NULL AND
-        attractie_max_gewicht >= {bezoeker["gewicht"]} OR attractie_max_gewicht IS NULL AND
+        (attractie_min_lengte <= %s OR attractie_min_lengte IS NULL) AND
+        (attractie_max_lengte >= %s OR attractie_max_lengte IS NULL) AND
+        (attractie_min_leeftijd <= %s OR attractie_min_leeftijd IS NULL) AND
+        (attractie_max_gewicht >= %s OR attractie_max_gewicht IS NULL) AND
         type != 'winkel' AND type != 'horeca'
-    """)
+    """, (bezoeker["lengte"], bezoeker["lengte"], bezoeker["leeftijd"], bezoeker["gewicht"]))
 
     if not bezoeker["voorkeuren_eten"]:
         horeca = thread_db.execute_query(f"""
@@ -74,8 +74,7 @@ def _generate_plan(bezoeker, temperatuur, regen):
         """)
         gekozen_horeca = horeca[randint(0, len(horeca)) - 1]
         if 15 > bezoeker["verblijfsduur"]:
-            #TODO maak een echte error
-            return "error"
+            raise Exception("Error: Verblijfsduur is onder de minimum vereiste")
         tijd_gebruikt += 15
     else:
         voorkeuren_lijst = [item.strip() for item in bezoeker["voorkeuren_eten"].split(",")]
@@ -85,8 +84,7 @@ def _generate_plan(bezoeker, temperatuur, regen):
         """)
         gekozen_horeca = horeca[randint(0, len(horeca)) - 1]
         if 15 > bezoeker["verblijfsduur"]:
-            #TODO maak een echte error
-            return "error"
+            raise Exception("Error: Verblijfsduur is onder de minimum vereiste")
         tijd_gebruikt += 15
 
     lievelingsattracties = bezoeker["lievelingsattracties"].split(",") if bezoeker["lievelingsattracties"] else []
@@ -161,8 +159,5 @@ if __name__ == "__main__":
         main()
         )
 
-
-#voeg anti sql injection toe
-#correcte velden toevoegen
-#in plaats van tijd aftrekken gwn bijhouden en dan vergelijken met verblijftijd
+#TODO: correcte json velden toevoegen
 #Onthou Types in gebruikers attractie voorkeuren zijn met hoofdletter maar type in voorziening is zonder hoofdletter
