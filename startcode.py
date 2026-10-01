@@ -47,6 +47,10 @@ def _generate_plan(bezoeker, temperatuur, regen):
     thread_db = Database(host="localhost", gebruiker="user", wachtwoord="password", database="attractiepark_casus_a")
     thread_db.connect()
 
+    tijd_gebruikt = 0
+
+    #TODO
+    #Deze functie uitwerken om de juiste horeca en winkels vooraf te berkenen
     #reserverd_items, reserverd_time =bereken_fixed_items(
     #    voorkeur_eten=bezoeker["voorkeuren_eten"], 
     #    verblijfsduur=bezoeker["verblijfsduur"],
@@ -54,10 +58,6 @@ def _generate_plan(bezoeker, temperatuur, regen):
     #    temperatuur=temperatuur,
     #    regen=regen,
     #    )
-
-    #tijd_left = bezoeker["verblijfsduur"] - reserverd_time
-
-    tijd_gebruikt = 0
     
     voorzieningen = thread_db.execute_query(f"""
         SELECT * FROM voorziening WHERE
@@ -79,6 +79,8 @@ def _generate_plan(bezoeker, temperatuur, regen):
     else:
         voorkeuren_lijst = [item.strip() for item in bezoeker["voorkeuren_eten"].split(",")]
         voorkeuren_string = ", ".join(f"'{item}'" for item in  voorkeuren_lijst)
+        #TODO
+        #Voeg sql params toe
         horeca = thread_db.execute_query(f"""
             SELECT * FROM voorziening WHERE type = 'horeca' AND productaanbod IN({voorkeuren_string}) 
         """)
@@ -96,6 +98,7 @@ def _generate_plan(bezoeker, temperatuur, regen):
             if favoriet == voorziening["naam"]:
                 favoriete_attractietijd_nodig = (int(voorziening["geschatte_wachttijd"]) + int(voorziening["doorlooptijd"])) * 2
                 if favoriete_attractietijd_nodig + tijd_gebruikt <= bezoeker["verblijfsduur"]:
+                    voorziening["is_favoriet"] = True
                     attractielijst.append(voorziening)
                     attractielijst.append(voorziening)
                     tijd_gebruikt += favoriete_attractietijd_nodig
