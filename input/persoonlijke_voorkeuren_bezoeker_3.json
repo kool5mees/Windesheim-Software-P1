@@ -1,0 +1,17 @@
+{
+    "metadata": {
+        "aanmeldzuil_id": 2,
+        "transactie_id": 655,
+        "datum_tijd": ["19-5-2024", "13:01"]
+    },
+    "naam": "Lisanne Hemman",
+    "gender": "V",
+    "leeftijd": 19,
+    "lengte": 165,
+    "gewicht": 70,
+    "verblijfsduur": 460,
+    "voorkeuren_attractietypes": ["Water"],
+    "voorkeuren_eten": [],
+    "lievelingsattracties": [],
+    "rekening_houden_met_weer": true
+}

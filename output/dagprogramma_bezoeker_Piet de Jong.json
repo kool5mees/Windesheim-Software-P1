@@ -1,0 +1,64 @@
+{
+    "bezoekersgegevens": {
+        "naam": "Piet de Jong",
+        "verblijfsduur": 600,
+        "leeftijd": 32,
+        "lengte": 190,
+        "gewicht": 105,
+        "voorkeuren_attractietypes": "Achtbaan,Simulator,Water",
+        "lievelingsattracties": "Sky Diver",
+        "voorkeuren_eten": "Patat,Snoep,IJs",
+        "rekening_houden_met_weer": false
+    },
+    "weergegevens": {
+        "temperatuur": 17.0,
+        "kans_op_regen": 0.0
+    },
+    "voorzieningen": [
+        {
+            "id": 7,
+            "naam": "Sky Diver",
+            "type": "achtbaan",
+            "overdekt": 0,
+            "geschatte_wachttijd": 35,
+            "doorlooptijd": 5,
+            "actief": 1,
+            "attractie_min_lengte": 140,
+            "attractie_max_lengte": null,
+            "attractie_min_leeftijd": 12,
+            "attractie_max_gewicht": 110,
+            "productaanbod": null,
+            "is_favoriet": true
+        },
+        {
+            "id": 54,
+            "naam": "Snack Bar",
+            "type": "horeca",
+            "overdekt": 1,
+            "geschatte_wachttijd": 8,
+            "doorlooptijd": 15,
+            "actief": 1,
+            "attractie_min_lengte": null,
+            "attractie_max_lengte": null,
+            "attractie_min_leeftijd": null,
+            "attractie_max_gewicht": null,
+            "productaanbod": "Patat"
+        },
+        {
+            "id": 7,
+            "naam": "Sky Diver",
+            "type": "achtbaan",
+            "overdekt": 0,
+            "geschatte_wachttijd": 35,
+            "doorlooptijd": 5,
+            "actief": 1,
+            "attractie_min_lengte": 140,
+            "attractie_max_lengte": null,
+            "attractie_min_leeftijd": 12,
+            "attractie_max_gewicht": 110,
+            "productaanbod": null,
+            "is_favoriet": true
+        }
+    ],
+    "totale_duur": 95
+}
