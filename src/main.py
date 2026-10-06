@@ -47,15 +47,13 @@ async def main():
 
     print(temperatuur, regen)
 
-
-
-    #haal de async event loop op
+    #store de event loop
     loop = asyncio.get_event_loop()
 
-    #maar een lijst met daarin _generate_plan en zijn argumeenten voor elke bezoeker die parallel gerund gaat worden
+    #maar een lijst met _generate_plan_thread aan voor elke bezoeker en start ze in hun eigen thread
     planningen = [loop.run_in_executor(None, _generate_plan_thread, bezoeker, temperatuur, regen) for bezoeker in bezoekers]
     
-    #verzamel alle _generate_plans en start ze in hun eigen threads
+    #verzamel en start alle planningen tegelijk
     await asyncio.gather(*planningen)
 
 if __name__ == "__main__":
