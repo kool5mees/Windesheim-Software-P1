@@ -22,6 +22,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "httpx" },
     { name = "mysql-connector-python" },
+    { name = "python-dotenv" },
     { name = "requests" },
 ]
 
@@ -29,6 +30,7 @@ dependencies = [
 requires-dist = [
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "mysql-connector-python", specifier = ">=26.7.0" },
+    { name = "python-dotenv", specifier = ">=1.2.4" },
     { name = "requests", specifier = ">=2.34.2" },
 ]
 
@@ -193,6 +195,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/02/be/c57e60d49e481cd8a7e5ab0ed874bf18dc90f32aed6d3953213ddbb7d86a/mysql_connector_python-26.7.0-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:76cffea9fc0cd9d4d5c79935a18342d9680f2c0dc0d5675b966b3df06229f238", size = 21747047, upload-time = "2026-07-29T10:18:45.719Z" },
     { url = "https://files.pythonhosted.org/packages/34/a6/946645e3c7e8feb159c97b2e8f612075e4ec08c0fb7d26d310d7e1b0e22c/mysql_connector_python-26.7.0-cp314-cp314-win_amd64.whl", hash = "sha256:a4eac2b4bcbf18fbaab736b5c3996425728472fea7b3d71a8c7056aa6349471f", size = 18207344, upload-time = "2026-07-29T10:18:47.926Z" },
     { url = "https://files.pythonhosted.org/packages/ff/01/07efeb3e3fc730f945af40ddf1f4c879c13945b193a94eba8e642c0d4176/mysql_connector_python-26.7.0-py2.py3-none-any.whl", hash = "sha256:43ee453b53556f690e4f4b795d3f17a1c6d4b45f729657bb0d999c8dfc9261d5", size = 480733, upload-time = "2026-07-29T10:18:49.777Z" },
+]
+
+[[package]]
+name = "python-dotenv"
+version = "1.2.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/74/26/2fbeedb218a787a5eea551c7532cac4e009f83d689dd2faa0d0353473f86/python_dotenv-1.2.4.tar.gz", hash = "sha256:f0d53e69935a851c0dcc78f3ab7aaccd8cabef0b92382b576b824212902873c0", size = 60824, upload-time = "2026-10-01T05:36:10Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/60/d1/38f3a3405989a89ac18390803e70c6ad7c7760da4f9b83cbeca0c44a0c72/python_dotenv-1.2.4-py3-none-any.whl", hash = "sha256:42269a8a5b3fd54ffa6f3d84b18abed50064717576b4ecf03dc4a55d8aa04fdc", size = 23266, upload-time = "2026-10-01T05:36:08.633Z" },
 ]
 
 [[package]]

@@ -4,10 +4,11 @@ from database_wrapper import Database
 import httpx
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
-from planning_genereren import _generate_plan_thread
+from planning_genereren import _generate_plan_thread, db_credentials
+
 
 #Database connectie
-db = Database(host="localhost", gebruiker="user", wachtwoord="password", database="attractiepark_casus_a")
+db = Database(host=db_credentials["host"], gebruiker=db_credentials["gebruiker"], wachtwoord=db_credentials["wachtwoord"], database="attractiepark_casus_a")
 
 #creer een threadpool voor het multithreaden van planningen berekenen
 executor = ThreadPoolExecutor(max_workers=10)
@@ -39,7 +40,9 @@ async def haal_bezoekers_uit_database():
     return bezoekers
 
 async def main():
-    #haal bezoekers en weer gegevens op
+  
+
+    #haal bezoekers en weer gegevens o
     bezoekers, (temperatuur, regen) = await asyncio.gather(
         haal_bezoekers_uit_database(),
         haal_weer_gegevens()

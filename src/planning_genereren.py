@@ -4,6 +4,13 @@ import json
 import pprint
 import asyncio
 import queue
+from dotenv import load_dotenv
+from os import getenv
+
+#TODO
+#dit is setup en hoort eigenlijk ergens anders maar ik heb het hier gezet voor nu zodat ik geen circular import krijg met main
+load_dotenv()
+db_credentials = {"host":getenv("host"), "gebruiker":getenv("gebruiker"), "wachtwoord": getenv("wachtwoord")}
 
 def _generate_plan_thread(bezoeker, temperatuur, regen):
     asyncio.run(_generate_plan(bezoeker, temperatuur, regen))
@@ -129,6 +136,10 @@ async def attractielijst_onder_4uur(lengte, leeftijd, gewicht, verblijfsduur, ge
             attractielijst.append(favoriet)
             totale_gebruikte_tijd += favoriete_attractietijd_nodig
 
+    #random shuffle helpt ietsje met het verbeteren van
+    random.shuffle(preffered_lijst)
+    random.shuffle(overige_lijst)
+
     #preffered attracties
     for preffered in preffered_lijst:
         preffered_attractietijd_nodig = (int(preffered["geschatte_wachttijd"]) + int(preffered["doorlooptijd"]))
@@ -232,7 +243,7 @@ async def schrijf_json_bestand(bezoeker, dagprogramma, tijd_gebruikt, planning, 
 
 
 async def _generate_plan(bezoeker, temperatuur, regen):
-    thread_db = Database(host="localhost", gebruiker="user", wachtwoord="password", database="attractiepark_casus_a")
+    thread_db = Database(host=db_credentials["host"], gebruiker=db_credentials["gebruiker"], wachtwoord=db_credentials["wachtwoord"], database="attractiepark_casus_a")
     await thread_db.connect()
 
     tijd_gebruikt = 0
