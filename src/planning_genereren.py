@@ -16,12 +16,7 @@ def _generate_plan_thread(bezoeker, temperatuur, regen):
     asyncio.run(_generate_plan(bezoeker, temperatuur, regen))
 
 async def bereken_fixed_items(voorkeur_eten:list, verblijfsduur:int, rekening_houden_weer:bool, temperatuur, regen:bool, execute_query):
-    #queue is eigenlijk voornamelijk voor thread safety en ookal doe ik multithreading is er geen comunicatie tussen threads
-    #ik gebruik het voornamelijk omdat het first in first out is in plaats van een list die first in last out is
-    #aangezien mijn fixed items list al gesorteerd is
-
     gereserveerde_items = queue.Queue(-1)
-    gereserveerde_tijd = 0
     is_weer_gevoelig = rekening_houden_weer and (temperatuur > 20 or regen > 50)
     langer_dan_4_uur = verblijfsduur > 240
     hvl_horeca_nodig = 0
@@ -44,7 +39,6 @@ async def bereken_fixed_items(voorkeur_eten:list, verblijfsduur:int, rekening_ho
             """)
             paraplu_winkel = random.choice(paraplu_winkels)
             gereserveerde_items.put(paraplu_winkel)
-            gereserveerde_tijd += (15 + paraplu_winkel["geschatte_wachttijd"] + paraplu_winkel["doorlooptijd"])
         if temperatuur > 20:
             ijswinkels = await execute_query(f"""
                 SELECT * FROM voorziening WHERE type = 'horeca' AND productaanbod = 'ijs'
@@ -52,14 +46,12 @@ async def bereken_fixed_items(voorkeur_eten:list, verblijfsduur:int, rekening_ho
             ijswinkel = random.choice(ijswinkels)
             gereserveerde_items.put(ijswinkel)
             hvl_horeca_nodig -= 1
-            gereserveerde_tijd += (15 + ijswinkel["geschatte_wachttijd"] + ijswinkel["doorlooptijd"])
 
     #haal alvaste souvenir winkel op voor einde
     souvenir_winkels = await execute_query(f"""
         SELECT * FROM voorziening WHERE type = 'winkel' AND productaanbod = 'Souvenirs'
     """)
     souvenir_winkel =  random.choice(souvenir_winkels)
-    gereserveerde_tijd += (15 + souvenir_winkel["geschatte_wachttijd"] + souvenir_winkel["doorlooptijd"])
 
     if hvl_horeca_nodig > 0:
         if not voorkeur_eten:
@@ -73,7 +65,6 @@ async def bereken_fixed_items(voorkeur_eten:list, verblijfsduur:int, rekening_ho
                     horeca_list_copy = horeca_list.copy()
                 gekozen_item = horeca_list_copy.pop(horeca_list_copy.index(random.choice(horeca_list_copy)))
                 gereserveerde_items.put(gekozen_item)
-                gereserveerde_tijd += (15 + gekozen_item["geschatte_wachttijd"] + gekozen_item["doorlooptijd"])
         else:
             voorkeuren_lijst = [item.strip() for item in voorkeur_eten.split(",")]
             horeca_list: list = await execute_query(f"""
@@ -86,22 +77,12 @@ async def bereken_fixed_items(voorkeur_eten:list, verblijfsduur:int, rekening_ho
                     horeca_list_copy = horeca_list.copy()
                 gekozen_item = horeca_list_copy.pop(horeca_list_copy.index(random.choice(horeca_list_copy)))
                 gereserveerde_items.put(gekozen_item)
-                gereserveerde_tijd += (15 + gekozen_item["geschatte_wachttijd"] + gekozen_item["doorlooptijd"])
 
-    
+    return gereserveerde_items, souvenir_winkel
 
-    if gereserveerde_tijd > verblijfsduur:
-        raise Exception("Error: verblijfsduur is te kort voor verijsde basis voorzieningen.")
-
-    #pprint.pp(gereserveerde_items.queue)
-
-    return gereserveerde_items, gereserveerde_tijd, souvenir_winkel
-
-async def attractielijst_kort_verblijf(verblijfsduur, gereserveerde_tijd, favoriete_lijst, preffered_lijst, overige_lijst):
+async def attractielijst_kort_verblijf(verblijfsduur, favoriete_lijst, preffered_lijst, overige_lijst):
     #attractielijst + voorzieningen voor een bezoeker met korter dan 4 uur verblijfsduur
-
-
-    totale_gebruikte_tijd = gereserveerde_tijd
+    totale_gebruikte_tijd = 0
     
     #lievelingsattracties
     attractielijst = []
@@ -130,13 +111,24 @@ async def attractielijst_kort_verblijf(verblijfsduur, gereserveerde_tijd, favori
     
     return attractielijst, totale_gebruikte_tijd
 
-async def attractieslijst_lang_verblijf(verblijfsduur, gereserveerde_tijd, favoriete_lijst, preffered_lijst, overige_lijst, gereserveerde_items:queue.Queue):
+def past_horeca(gereserveerde_items:queue.Queue, attractielijst:list, totale_gebruikte_tijd, verblijfsduur):
+    if gereserveerde_items.empty():
+        return totale_gebruikte_tijd, False
+    horeca_item = gereserveerde_items.queue[0]
+    horeca_tijd = 15 + horeca_item["geschatte_wachttijd"] + horeca_item["doorlooptijd"]
+    if totale_gebruikte_tijd + horeca_tijd > verblijfsduur:
+        return totale_gebruikte_tijd, False
+    horeca_item = gereserveerde_items.get()
+    attractielijst.append(horeca_item)
+    return totale_gebruikte_tijd + horeca_tijd, True
+
+async def attractieslijst_lang_verblijf(verblijfsduur, favoriete_lijst, preffered_lijst, overige_lijst, gereserveerde_items:queue.Queue):
     #attractielijst + voorziening voor bezoeker met verblijfsduur langer dan 4 uur
     #BUG
     #.get() op een lege queue blijft eeuwig hangen
 
     twee_uur = 0
-    totale_gebruikte_tijd = gereserveerde_tijd
+    totale_gebruikte_tijd = 0
     #lievelingsattracties
     attractielijst = []
     for favoriet in favoriete_lijst:
@@ -147,8 +139,14 @@ async def attractieslijst_lang_verblijf(verblijfsduur, gereserveerde_tijd, favor
             totale_gebruikte_tijd += favoriete_attractietijd_nodig
             twee_uur += favoriete_attractietijd_nodig
             if twee_uur > 120:
-                attractielijst.append(gereserveerde_items.get())
-                twee_uur = 0
+                totale_gebruikte_tijd, toegevoegd = past_horeca(
+                    gereserveerde_items=gereserveerde_items,
+                    attractielijst=attractielijst,
+                    totale_gebruikte_tijd=totale_gebruikte_tijd,
+                    verblijfsduur=verblijfsduur
+                    )
+                if toegevoegd:
+                    twee_uur = 0
 
     #preffered attracties
     for preffered in preffered_lijst:
@@ -158,9 +156,15 @@ async def attractieslijst_lang_verblijf(verblijfsduur, gereserveerde_tijd, favor
             totale_gebruikte_tijd += preffered_attractietijd_nodig
             twee_uur += preffered_attractietijd_nodig
             if twee_uur > 120:
-                attractielijst.append(gereserveerde_items.get())
-                twee_uur = 0
-
+                totale_gebruikte_tijd, toegevoegd = past_horeca(
+                    gereserveerde_items=gereserveerde_items,
+                    attractielijst=attractielijst,
+                    totale_gebruikte_tijd=totale_gebruikte_tijd,
+                    verblijfsduur=verblijfsduur
+                    )
+                if toegevoegd:
+                    twee_uur = 0
+                
     #overige attracties
     for overige in overige_lijst:
         overige_attractietijd_nodig = (int(overige["geschatte_wachttijd"]) + int(overige["doorlooptijd"]))
@@ -169,8 +173,14 @@ async def attractieslijst_lang_verblijf(verblijfsduur, gereserveerde_tijd, favor
             totale_gebruikte_tijd += overige_attractietijd_nodig
             twee_uur += overige_attractietijd_nodig
             if twee_uur > 120:
-                attractielijst.append(gereserveerde_items.get())
-                twee_uur = 0
+                totale_gebruikte_tijd, toegevoegd = past_horeca(
+                    gereserveerde_items=gereserveerde_items,
+                    attractielijst=attractielijst,
+                    totale_gebruikte_tijd=totale_gebruikte_tijd,
+                    verblijfsduur=verblijfsduur
+                    )
+                if toegevoegd:
+                    twee_uur = 0
     
     return attractielijst, totale_gebruikte_tijd
 
@@ -184,8 +194,7 @@ async def bereken_attracties(
         verblijfsduur:int, 
         rekening_houden_weer:bool,  
         regen:bool, 
-        execute_query, 
-        gereserveerde_tijd:int,
+        execute_query,
         gereserveerde_items: queue.Queue,
         souvenir_winekel
     ):
@@ -233,37 +242,42 @@ async def bereken_attracties(
     #random shuffle helpt ietsje met het verbeteren van
     random.shuffle(preffered_lijst)
     random.shuffle(overige_lijst)
+    totale_gebruikte_tijd = 0
 
     if rekening_houden_weer and regen > 50 and not gereserveerde_items.empty():
-        planning.append(gereserveerde_items.get())
+        paraplu_winkel = gereserveerde_items.get()
+        planning.append(paraplu_winkel)
+        totale_gebruikte_tijd += (paraplu_winkel["geschatte_wachttijd"] + paraplu_winkel["doorlooptijd"])
 
+    beschikbaare_tijd = ((verblijfsduur - totale_gebruikte_tijd) - (souvenir_winekel["geschatte_wachttijd"] + souvenir_winekel["doorlooptijd"]))
     if verblijfsduur <= 240 and not gereserveerde_items.empty():
-        attracties, totale_gebruikte_tijd = await attractielijst_kort_verblijf(
-            verblijfsduur=verblijfsduur,
-            gereserveerde_tijd=gereserveerde_tijd,
+        horeca_item = gereserveerde_items.get()
+        beschikbaare_tijd -= (15 + horeca_item["geschatte_wachttijd"] + horeca_item["doorlooptijd"])
+
+    if verblijfsduur <= 240:
+        attracties, voorzieningen_tijd = await attractielijst_kort_verblijf(
+            verblijfsduur=beschikbaare_tijd,
             favoriete_lijst=favoriete_lijst,
             preffered_lijst=preffered_lijst,
             overige_lijst=overige_lijst
             )
         planning.extend(attracties)
         midden = len(planning) // 2
-        planning.insert(midden, gereserveerde_items.get())
-        planning.append(souvenir_winekel)
-        return planning, totale_gebruikte_tijd
+        planning.insert(midden, horeca_item)
+        totale_gebruikte_tijd += (15 + horeca_item["geschatte_wachttijd"] + horeca_item["doorlooptijd"])
     else:
-        attracties, totale_gebruikte_tijd = await attractieslijst_lang_verblijf(
-            verblijfsduur=verblijfsduur,
-            gereserveerde_tijd=gereserveerde_tijd,
+        attracties, voorzieningen_tijd = await attractieslijst_lang_verblijf(
+            verblijfsduur=beschikbaare_tijd,
             favoriete_lijst=favoriete_lijst,
             preffered_lijst=preffered_lijst,
             overige_lijst=overige_lijst,
             gereserveerde_items=gereserveerde_items
         )
         planning.extend(attracties)
-        planning.append(souvenir_winekel)
-        return planning, totale_gebruikte_tijd
-
-    #return planning, attracties_tijd
+    
+    planning.append(souvenir_winekel)
+    totale_gebruikte_tijd += (souvenir_winekel["geschatte_wachttijd"] + souvenir_winekel["doorlooptijd"] + voorzieningen_tijd)
+    return planning, totale_gebruikte_tijd
 
 async def schrijf_json_bestand(bezoeker, dagprogramma, tijd_gebruikt, planning, temperatuur, regen):
     bezoeker["rekening_houden_met_weer"] = True if bezoeker["rekening_houden_met_weer"] == 1 else False
@@ -301,7 +315,7 @@ async def _generate_plan(bezoeker, temperatuur, regen):
 
     tijd_gebruikt = 0
 
-    gereserveerde_items, gereserveerde_tijd, souvenir_winkel = await bereken_fixed_items(
+    gereserveerde_items, souvenir_winkel = await bereken_fixed_items(
         voorkeur_eten=bezoeker["voorkeuren_eten"], 
         verblijfsduur=bezoeker["verblijfsduur"],
         rekening_houden_weer=bool(bezoeker["rekening_houden_met_weer"]),
@@ -310,13 +324,10 @@ async def _generate_plan(bezoeker, temperatuur, regen):
         execute_query=thread_db.execute_query
     )
 
-    tijd_gebruikt += gereserveerde_tijd
-
     #----#
     
     planning, attracties_tijd = await bereken_attracties(
         verblijfsduur=bezoeker["verblijfsduur"],
-        gereserveerde_tijd=tijd_gebruikt,
         gereserveerde_items=gereserveerde_items,
         lengte=bezoeker["lengte"],
         leeftijd=bezoeker["leeftijd"],
@@ -328,7 +339,6 @@ async def _generate_plan(bezoeker, temperatuur, regen):
         souvenir_winekel=souvenir_winkel,
         execute_query=thread_db.execute_query
     )
-
 
     #----#
     await schrijf_json_bestand(bezoeker, planning=planning, tijd_gebruikt=attracties_tijd, temperatuur=temperatuur, regen=regen, dagprogramma=planning)
